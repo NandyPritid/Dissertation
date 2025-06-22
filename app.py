@@ -1,137 +1,190 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# ## Dissertation Gantt Tracker Dashboard
+"""
+Dissertation Gantt Tracker Dashboard
 
-# 
-# 
-# 
-# This Dash app visualizes and manages the progress of a dissertation project
-# as an editable Gantt chart. It allows for task tracking, progress updates,
-# and supervisor comments. Edits made in the table are persisted to CSV.
-# 
-# Author: Pritid Nandy
-# Date: June 2025
+This Dash app visualizes and manages the progress of a dissertation project
+as an editable Gantt chart. It allows for task tracking, progress updates,
+and supervisor comments. Edits made in the table are persisted to CSV.
 
-# In[1]:
-
+Author: Pritid Nandy
+Date: June 2025
+"""
 
 import os
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from dash import Dash, dcc, html, Input, Output, State, dash_table
 from flask import send_from_directory
 import datetime
+import base64
 
 # Constants
 DOCS_FOLDER = "docs"
 if not os.path.exists(DOCS_FOLDER):
     os.makedirs(DOCS_FOLDER)
 
+# Create sample data if files don't exist
+def create_sample_data():
+    if not os.path.exists("gantt_data.csv"):
+        sample_gantt = pd.DataFrame({
+            'Task': ['Literature Review', 'Data Collection', 'Analysis', 'Writing', 'Revision'],
+            'Phase': ['Research', 'Research', 'Analysis', 'Writing', 'Writing'],
+            'Start': ['2025-01-01', '2025-02-01', '2025-03-01', '2025-04-01', '2025-05-01'],
+            'Finish': ['2025-01-31', '2025-02-28', '2025-03-31', '2025-04-30', '2025-05-31'],
+            'Progress': ['100%', '80%', '60%', '40%', '0%'],
+            'Notes': ['Completed', 'In Progress', 'Starting', 'Planned', 'Planned']
+        })
+        sample_gantt.to_csv("gantt_data.csv", index=False)
+    
+    if not os.path.exists("eu_exports.csv"):
+        sample_exports = pd.DataFrame({
+            'Product': ['Whiskies', 'Gin', 'Vodka', 'Liqueurs', 'Ethyl alcohol'],
+            'EU Export (£)': ['£1,250,000', '£890,000', '£650,000', '£420,000', '£320,000'],
+            'Year': [2024, 2024, 2024, 2024, 2024]
+        })
+        sample_exports.to_csv("eu_exports.csv", index=False)
+
+# Initialize sample data
+create_sample_data()
+
 # Load data
-df = pd.read_csv("gantt_data.csv")
-df['Start'] = pd.to_datetime(df['Start'])
-df['Finish'] = pd.to_datetime(df['Finish'])
+try:
+    df = pd.read_csv("gantt_data.csv")
+    df['Start'] = pd.to_datetime(df['Start'])
+    df['Finish'] = pd.to_datetime(df['Finish'])
+except Exception as e:
+    print(f"Error loading gantt_data.csv: {e}")
+    # Create minimal fallback data
+    df = pd.DataFrame({
+        'Task': ['Sample Task'],
+        'Phase': ['Research'],
+        'Start': [pd.Timestamp('2025-01-01')],
+        'Finish': [pd.Timestamp('2025-01-31')],
+        'Progress': ['50%'],
+        'Notes': ['Sample note']
+    })
 
 def create_spirit_glass_chart_from_csv(filepath="eu_exports.csv"):
-    import plotly.graph_objects as go
-
-    df = pd.read_csv(filepath)
-
-    # Clean export values: remove £ and commas, convert to float
-    df["EU Export (£)"] = df["EU Export (£)"].replace('[£,]', '', regex=True).astype(float)
-
-    # Keep only spirit categories (excluding sugary waters, cider, etc.)
-    spirit_df = df[df["Product"].str.contains("Whiskies|Gin|Vodka|Liqueurs|Ethyl alcohol", case=False)]
-
-    # Sort descending by value
-    spirit_df = spirit_df.sort_values(by="EU Export (£)", ascending=False)
-
-    colors = ["#b5651d", "#f4d03f", "#d98880", "#5dade2", "#bb8fce", "#85c1e9"]
-
-    fig = go.Figure()
-    total = spirit_df["EU Export (£)"].sum()
-    cumulative = 0
-
-    for i, row in enumerate(spirit_df.itertuples()):
-        fig.add_trace(go.Bar(
-            y=["Total Export"],
-            x=[row._4],
-            name=row.Product,
-            orientation="h",
-            marker_color=colors[i % len(colors)],
-            base=cumulative,
-            hovertemplate=f"<b>{row.Product}</b><br>Export: £{{x:,.0f}}<br>Share: {row._4 / total:.1%}<extra></extra>"
-        ))
-        cumulative += row._4
-
-    fig.update_layout(
-        title="🥃 EU Spirit Exports (2021–2025): 'Spirit in a Glass' Visualisation",
-        barmode="stack",
-        xaxis=dict(title="Export Value (£)", tickformat=","),
-        yaxis=dict(showticklabels=False),
-        height=300,
-        margin=dict(l=30, r=30, t=60, b=40),
-        showlegend=True
-    )
-
-    return fig
+    """Create spirit exports visualization"""
+    try:
+        df_exports = pd.read_csv(filepath)
+        
+        # Clean export values: remove £ and commas, convert to float
+        df_exports["EU Export (£)"] = df_exports["EU Export (£)"].replace('[£,]', '', regex=True).astype(float)
+        
+        # Keep only spirit categories (excluding sugary waters, cider, etc.)
+        spirit_df = df_exports[df_exports["Product"].str.contains("Whiskies|Gin|Vodka|Liqueurs|Ethyl alcohol", case=False)]
+        
+        # Sort descending by value
+        spirit_df = spirit_df.sort_values(by="EU Export (£)", ascending=False)
+        
+        colors = ["#b5651d", "#f4d03f", "#d98880", "#5dade2", "#bb8fce", "#85c1e9"]
+        
+        fig = go.Figure()
+        total = spirit_df["EU Export (£)"].sum()
+        cumulative = 0
+        
+        for i, row in enumerate(spirit_df.itertuples()):
+            export_value = getattr(row, 'EU Export (£)', 0)
+            fig.add_trace(go.Bar(
+                y=["Total Export"],
+                x=[export_value],
+                name=row.Product,
+                orientation="h",
+                marker_color=colors[i % len(colors)],
+                base=cumulative,
+                hovertemplate=f"<b>{row.Product}</b><br>Export: £{{x:,.0f}}<br>Share: {export_value / total:.1%}<extra></extra>"
+            ))
+            cumulative += export_value
+        
+        fig.update_layout(
+            title="🥃 EU Spirit Exports (2021–2025): 'Spirit in a Glass' Visualisation",
+            barmode="stack",
+            xaxis=dict(title="Export Value (£)", tickformat=","),
+            yaxis=dict(showticklabels=False),
+            height=300,
+            margin=dict(l=30, r=30, t=60, b=40),
+            showlegend=True
+        )
+        
+        return fig
+    except Exception as e:
+        print(f"Error creating spirit chart: {e}")
+        # Return empty figure if there's an error
+        fig = go.Figure()
+        fig.update_layout(title="⚠️ Unable to load spirit exports data")
+        return fig
 
 # Initialize app
 app = Dash(__name__)
-server = app.server  # Needed for file download
+server = app.server  # Needed for deployment and file download
 
 # Gantt Chart Generator
 def create_figure(dataframe):
-    fig = px.timeline(
-        dataframe,
-        x_start="Start", x_end="Finish",
-        y="Task", color="Phase", text="Progress",
-        title="Dissertation Gantt Chart"
-    )
-    fig.update_yaxes(autorange="reversed")
-    fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=40, b=20))
-    return fig
-# 🔁 Generate clickable file links
-def get_file_links():
-    links = []
-    for filename in sorted(os.listdir(DOCS_FOLDER)):
-        path = f"/docs/{filename}"
-        links.append(html.Div([
-            html.A(f"📄 {filename}", href=path, target="_blank", style={'fontFamily': 'Georgia'})
-        ]))
-    return links
+    """Create Gantt chart from dataframe"""
+    try:
+        fig = px.timeline(
+            dataframe,
+            x_start="Start", x_end="Finish",
+            y="Task", color="Phase", text="Progress",
+            title="Dissertation Gantt Chart"
+        )
+        fig.update_yaxes(autorange="reversed")
+        fig.update_layout(showlegend=False, margin=dict(l=20, r=20, t=40, b=20))
+        return fig
+    except Exception as e:
+        print(f"Error creating Gantt chart: {e}")
+        fig = go.Figure()
+        fig.update_layout(title="⚠️ Unable to create Gantt chart")
+        return fig
 
-# ✅ App layout starts AFTER the function is defined
+def get_file_links():
+    """Generate clickable file links"""
+    try:
+        files = sorted(os.listdir(DOCS_FOLDER))
+        links = []
+        for filename in files:
+            if filename.startswith("."):  # skip hidden files
+                continue
+            path = f"/docs/{filename}"
+            links.append(html.Div([
+                html.A(f"📄 {filename}", href=path, target="_blank", style={'fontFamily': 'Georgia'})
+            ]))
+        return links or [html.Div("📂 No documents uploaded yet.")]
+    except Exception as e:
+        return [html.Div(f"⚠️ Error loading files: {e}")]
+
+# App layout
 app.layout = html.Div([
     html.H1("🧾 Dissertation Gantt Tracker", style={'fontFamily': 'Georgia'}),
 
     # 📊 Gantt chart
     dcc.Graph(id="gantt", figure=create_figure(df)),
 
-    # 🍸 Spirit Chart (Insert Here)
+    # 🍸 Spirit Chart
     html.H2("🥃 EU Spirit Exports: 'Spirit in a Glass' Chart", style={'fontFamily': 'Georgia'}),
     html.Div([
         html.Div(
             dcc.Graph(figure=create_spirit_glass_chart_from_csv()),
             style={'width': '65%', 'display': 'inline-block', 'verticalAlign': 'top'}
         ),
-        html.Div(
+        html.Div([
             dash_table.DataTable(
                 id='eu-exports-table',
                 columns=[
                     {"name": col, "id": col} for col in pd.read_csv("eu_exports.csv").columns
-                ],
-                data=pd.read_csv("eu_exports.csv").to_dict('records'),
+                ] if os.path.exists("eu_exports.csv") else [],
+                data=pd.read_csv("eu_exports.csv").to_dict('records') if os.path.exists("eu_exports.csv") else [],
                 style_table={'overflowX': 'auto'},
                 style_cell={'fontFamily': 'Georgia', 'textAlign': 'left'},
                 style_header={'fontWeight': 'bold'},
                 page_size=10
-            ),
-            style={'width': '33%', 'display': 'inline-block', 'paddingLeft': '15px'}
-        )
+            )
+        ], style={'width': '33%', 'display': 'inline-block', 'paddingLeft': '15px'})
     ]),
-
 
     # 📝 Data Table for editing
     html.H2("📋 Edit Progress and Notes", style={'fontFamily': 'Georgia'}),
@@ -143,7 +196,7 @@ app.layout = html.Div([
         style_table={'overflowX': 'auto'},
         style_cell={'textAlign': 'left', 'fontFamily': 'Georgia'},
     ),
-    html.Button("Update Chart", id='update', n_clicks=0),
+    html.Button("Update Chart", id='update', n_clicks=0, style={'margin': '10px'}),
     html.Div(id='update-msg', style={'marginTop': '10px', 'fontStyle': 'italic'}),
 
     # 📁 File upload/view
@@ -170,7 +223,6 @@ app.layout = html.Div([
     html.Div(children=get_file_links(), id='file-list', style={'marginTop': '10px'})
 ])
 
-
 # 📊 Update Chart + Save Edits
 @app.callback(
     Output("gantt", "figure"),
@@ -179,17 +231,20 @@ app.layout = html.Div([
     State("datatable", "data")
 )
 def update_chart(n_clicks, data):
-    if not data:
-        return create_figure(df), "⚠️ No data to update."
-    updated_df = pd.DataFrame(data)
-    updated_df['Start'] = pd.to_datetime(updated_df['Start'])
-    updated_df['Finish'] = pd.to_datetime(updated_df['Finish'])
-    updated_df.to_csv("gantt_data.csv", index=False)
-    return create_figure(updated_df), "✅ Chart updated and saved."
+    """Update chart and save data"""
+    if not data or n_clicks == 0:
+        return create_figure(df), ""
+    
+    try:
+        updated_df = pd.DataFrame(data)
+        updated_df['Start'] = pd.to_datetime(updated_df['Start'])
+        updated_df['Finish'] = pd.to_datetime(updated_df['Finish'])
+        updated_df.to_csv("gantt_data.csv", index=False)
+        return create_figure(updated_df), "✅ Chart updated and saved."
+    except Exception as e:
+        return create_figure(df), f"⚠️ Error updating chart: {str(e)}"
 
 # 📁 Save uploaded files
-import base64
-
 @app.callback(
     Output('file-list', 'children'),
     Input('upload-data', 'contents'),
@@ -197,6 +252,7 @@ import base64
     prevent_initial_call=True
 )
 def save_file(contents, filenames):
+    """Save uploaded files"""
     if contents and filenames:
         for content, name in zip(contents, filenames):
             try:
@@ -208,38 +264,17 @@ def save_file(contents, filenames):
                 print(f"Error saving file {name}: {e}")
     return get_file_links()
 
-# 📄 Generate clickable links for all docs
-DOCS_FOLDER = "docs"
-os.makedirs(DOCS_FOLDER, exist_ok=True)
-
-def get_file_links():
-    try:
-        files = sorted(os.listdir(DOCS_FOLDER))
-        links = []
-        for filename in files:
-            if filename.startswith("."):  # skip hidden files
-                continue
-            path = f"/docs/{filename}"
-            links.append(html.Div([
-                html.A(f"📄 {filename}", href=path, target="_blank", style={'fontFamily': 'Georgia'})
-            ]))
-        return links or [html.Div("📂 No documents uploaded yet.")]
-    except Exception as e:
-        return [html.Div(f"⚠️ Error loading files: {e}")]
-
 # 🧭 Route to serve uploaded files
 @server.route("/docs/<path:filename>")
 def serve_file(filename):
-    return send_from_directory(DOCS_FOLDER, filename, as_attachment=False)
+    """Serve uploaded files"""
+    try:
+        return send_from_directory(DOCS_FOLDER, filename, as_attachment=False)
+    except Exception as e:
+        return f"Error serving file: {e}", 404
 
 # 🚀 Launch
 if __name__ == '__main__':
-    app.run_server(host="0.0.0.0", port=10000, debug=False)
-#   app.run_server(jupyter_mode='external', debug=True, port=7400)
-
-
-# In[ ]:
-
-
-
-
+    # Get port from environment variable (required for cloud deployment)
+    port = int(os.environ.get('PORT', 10000))
+    app.run_server(host="0.0.0.0", port=port, debug=False)
