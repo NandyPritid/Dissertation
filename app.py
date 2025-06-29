@@ -30,12 +30,36 @@ if not os.path.exists(DOCS_FOLDER):
 def create_sample_data():
     if not os.path.exists("gantt_data.csv"):
         sample_gantt = pd.DataFrame({
-            'Task': ['Literature Review', 'Data Collection', 'Analysis', 'Writing', 'Revision'],
-            'Phase': ['Research', 'Research', 'Analysis', 'Writing', 'Writing'],
-            'Start': ['2025-01-01', '2025-02-01', '2025-03-01', '2025-04-01', '2025-05-01'],
-            'Finish': ['2025-01-31', '2025-02-28', '2025-03-31', '2025-04-30', '2025-05-31'],
-            'Progress': ['100%', '80%', '60%', '40%', '0%'],
-            'Notes': ['Completed', 'In Progress', 'Starting', 'Planned', 'Planned']
+            'Task': [
+                'Literature Review & Finalizing Proposal',
+                'Data Collection & Preparation', 
+                'Model Development & Testing',
+                'Analysis & Scenario Modelling',
+                'Drafting Report & Visuals',
+                'Supervisor Review Period',
+                'Incorporate Feedback & Final Polish',
+                'Final Submission'
+            ],
+            'Phase': ['Planning', 'Preparation', 'Development', 'Analysis', 'Reporting', 'Review', 'Revision', 'Submission'],
+            'Start': [
+                '2025-06-17', '2025-06-17', '2025-07-01', '2025-07-29', 
+                '2025-07-29', '2025-08-12', '2025-08-26', '2025-09-03'
+            ],
+            'Finish': [
+                '2025-06-30', '2025-07-28', '2025-08-11', '2025-08-11',
+                '2025-08-11', '2025-08-25', '2025-09-02', '2025-09-03'
+            ],
+            'Progress': ['100%', '50%', '20%', '0%', '0%', '0%', '0%', '0%'],
+            'Notes': [
+                'Completed - proposal finalized',
+                'Ongoing - data gathering in progress', 
+                'Starting model framework',
+                'Planned - forecasting scenarios',
+                'Planned - first draft completion',
+                '2 weeks for supervisor feedback - CRITICAL',
+                'Address supervisor comments',
+                'DEADLINE - Submit by end of day'
+            ]
         })
         sample_gantt.to_csv("gantt_data.csv", index=False)
     
